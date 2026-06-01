@@ -1,0 +1,11 @@
+
+config {
+  type: "view",
+  schema: "BQ_PFU_INCIPY"
+}
+
+select p.* from ${ref("purchases")} p
+  CROSS JOIN ${ref("min_event_timestamp")} mit
+  CROSS JOIN ${ref("max_event_timestamp")} mat
+  CROSS JOIN ${ref("max_createdon_cte")} mc
+  WHERE p.purchase_timestamp <= LEAST(mc.max_createdon, mat.max_timestamp)

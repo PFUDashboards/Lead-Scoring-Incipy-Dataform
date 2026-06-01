@@ -1,0 +1,10 @@
+config {
+  type: "view",
+  schema: "BQ_PFU_INCIPY"
+}
+
+
+SELECT * FROM ${ref("pre_event")}
+WHERE event_name <> 'purchase' and event_name <> 'generate_lead'
+AND event_timestamp >= UNIX_MICROS(
+  TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 365 DAY))

@@ -1,0 +1,32 @@
+config {
+  type: "view",
+  schema: "BQ_PFU_INCIPY"
+}
+
+  SELECT
+    user_pseudo_id,
+    event_name,
+    event_timestamp,
+
+    (SELECT value.int_value 
+     FROM UNNEST(event_params) 
+     WHERE key = 'ga_session_id') AS ga_session_id,
+    
+    
+    ARRAY(
+      SELECT item.item_id
+      FROM UNNEST(items) AS item
+      WHERE item.item_id IS NOT NULL
+    ) AS item_ids,
+
+    collected_traffic_source.manual_campaign_id AS campaign_ids,
+
+    device. category AS device_used,
+
+    (SELECT value.string_value 
+    FROM UNNEST(event_params) 
+    WHERE key = 'source') AS page_referrer
+
+
+  FROM ${ref("base")} 
+    WHERE user_pseudo_id IS NOT NULL

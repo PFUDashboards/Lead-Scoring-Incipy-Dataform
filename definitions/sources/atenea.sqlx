@@ -1,0 +1,7 @@
+
+config {
+  type: "declaration",
+  database: "bq-pfu-ga4",
+  schema: "BQ_PFU_INCIPY",
+  name: "Atenea"
+}

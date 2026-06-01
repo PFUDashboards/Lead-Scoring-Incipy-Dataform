@@ -1,0 +1,34 @@
+
+config {
+  type: "view",
+  schema: "BQ_PFU_INCIPY"
+}
+
+
+WITH atenea_window AS (
+  SELECT *
+  FROM ${ref("pre_atenea")} pa
+  CROSS JOIN ${ref("min_event_timestamp")} mit
+  CROSS JOIN ${ref("max_event_timestamp")} mat
+  CROSS JOIN ${ref("max_createdon_cte")} mc
+  WHERE pa.ld_timestamp <= LEAST(mc.max_createdon, mat.max_timestamp)
+    AND pa.ld_timestamp >= mit.min_timestamp + 365 * 24 * 60 * 60 * 1000000)
+
+SELECT ld_timestamp, lead_day, lead_month, lead_year,
+  ld_mcs_id, 
+  apd_es_matricula FROM (
+  SELECT *, ROW_NUMBER() OVER (
+    PARTITION BY 
+        ld_mcs_id,
+        lead_day,
+        lead_month,
+        lead_year
+    ORDER BY ld_timestamp DESC) AS rn
+    FROM atenea_window)
+WHERE rn =1
+
+
+
+
+
+

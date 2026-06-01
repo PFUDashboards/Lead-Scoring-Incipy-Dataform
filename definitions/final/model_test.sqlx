@@ -1,0 +1,8 @@
+config {
+  type: "table",
+  schema: "BQ_PFU_INCIPY"
+}
+
+SELECT 
+* 
+ FROM ${ref("features_pred")} 

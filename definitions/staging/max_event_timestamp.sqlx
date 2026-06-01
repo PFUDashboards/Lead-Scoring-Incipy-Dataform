@@ -1,0 +1,9 @@
+
+config {
+  type: "view",
+  schema: "BQ_PFU_INCIPY"
+}
+
+SELECT 
+  MAX(event_timestamp) AS max_timestamp
+  FROM ${ref("base_training")}

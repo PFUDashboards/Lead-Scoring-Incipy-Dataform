@@ -1,0 +1,9 @@
+
+config {
+  type: "view",
+  schema: "BQ_PFU_INCIPY"
+}
+
+SELECT
+  MAX(ld_timestamp) AS max_createdon
+FROM ${ref("pre_atenea")}
