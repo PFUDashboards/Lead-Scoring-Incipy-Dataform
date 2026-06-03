@@ -29,5 +29,5 @@ SELECT
     geo.country as country,
     geo.region as region
 
-  FROM ${ref("base_training")}
+  FROM ${ref("base")}
   WHERE event_name = 'purchase' 

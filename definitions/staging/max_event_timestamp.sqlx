@@ -6,4 +6,4 @@ config {
 
 SELECT 
   MAX(event_timestamp) AS max_timestamp
-  FROM ${ref("base_training")}
+  FROM ${ref("base")}
