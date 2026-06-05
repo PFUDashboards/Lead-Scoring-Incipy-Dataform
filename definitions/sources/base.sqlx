@@ -1,0 +1,9 @@
+config {
+  type: "view",
+  schema: "BQ_PFU_INCIPY",
+  name: "base"
+}
+
+  SELECT * FROM `bq-pfu-ga4.analytics_261171297.events_*` 
+  WHERE REGEXP_CONTAINS(_TABLE_SUFFIX, r'^\d{8}$')
+  AND _TABLE_SUFFIX >= FORMAT_DATE('%Y%m%d', DATE_SUB(CURRENT_DATE(), INTERVAL 2 YEAR))

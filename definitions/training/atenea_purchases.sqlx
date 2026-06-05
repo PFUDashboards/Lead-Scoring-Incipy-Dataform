@@ -1,0 +1,11 @@
+
+config {
+  type: "view",
+  schema: "BQ_PFU_INCIPY"
+}
+
+SELECT DISTINCT * EXCEPT(ld_timestamp) FROM ${ref("atenea_window")} a INNER JOIN ${ref("purchase_window")} p
+ON p.transaction_id = a.ld_mcs_id 
+AND p.purchase_day = a.lead_day 
+AND p.purchase_month = a.lead_month 
+AND p.purchase_year = a.lead_year

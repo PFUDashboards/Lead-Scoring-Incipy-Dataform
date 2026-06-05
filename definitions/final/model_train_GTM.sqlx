@@ -1,0 +1,12 @@
+config {
+  type: "table",
+  schema: "BQ_PFU_INCIPY"
+}
+
+ SELECT
+  l.* EXCEPT(lead_day, lead_month, lead_year, purchase_day, purchase_month, purchase_year, lead_id, 
+  transaction_id, purchase_timestamp)
+
+FROM ${ref("atenea_purchases")} l
+INNER JOIN ${ref("valid_leads")} vl
+ON l.ld_mcs_id = vl.ld_mcs_id

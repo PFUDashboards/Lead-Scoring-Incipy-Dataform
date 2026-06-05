@@ -1,0 +1,11 @@
+config {
+  type: "view",
+  schema: "BQ_PFU_INCIPY"
+}
+
+
+SELECT
+    ld_mcs_id
+  FROM ${ref("atenea_purchases")}
+  GROUP BY ld_mcs_id
+  HAVING COUNT(DISTINCT CONCAT(CAST(user_pseudo_id AS STRING),'|', CAST(ga_session_id AS STRING))) = 1

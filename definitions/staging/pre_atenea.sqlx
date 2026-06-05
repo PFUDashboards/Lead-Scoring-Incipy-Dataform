@@ -1,0 +1,15 @@
+config {
+  type: "view",
+  schema: "BQ_PFU_INCIPY"
+}
+
+SELECT
+  UNIX_MICROS(TIMESTAMP(ld_createdon)) AS ld_timestamp,
+
+  EXTRACT(DAY FROM TIMESTAMP(ld_createdon)) AS lead_day,
+  EXTRACT(MONTH FROM TIMESTAMP(ld_createdon)) AS lead_month,
+  EXTRACT(YEAR FROM TIMESTAMP(ld_createdon)) AS lead_year,
+  ld_mcs_id,
+  apd_es_matricula
+
+FROM ${ref("Atenea")}
