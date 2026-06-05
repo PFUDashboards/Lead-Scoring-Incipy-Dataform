@@ -9,25 +9,20 @@ SELECT
     EXTRACT(DAY FROM TIMESTAMP_MICROS(event_timestamp)) AS purchase_day,
     EXTRACT(MONTH FROM TIMESTAMP_MICROS(event_timestamp)) AS purchase_month,
     EXTRACT(YEAR FROM TIMESTAMP_MICROS(event_timestamp)) AS purchase_year,
-    EXTRACT(HOUR FROM TIMESTAMP_MICROS(event_timestamp)) AS purchase_hour,
     (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'lead_id') AS lead_id,
     (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'transaction_id') AS transaction_id,
     (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'product_id') AS product_id,
-
-    (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_title') AS page_title,
-    (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_path') AS page_path,
-    (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'form_type') AS form_type,
+    (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_name') AS page_name,
+    (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'page_location') AS page_location,
+    (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'platform') AS platform,
     (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'form_name') AS form_name,
-    (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'form_position') AS form_position,
-    (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'form_display') AS form_display,
     (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'market_site') AS  market_site,
-    (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_id') AS  purchase_session_id,
-    (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'session_engaged') AS  session_engaged,
-    device. category AS purchase_device,
-    (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'engagement_time_msec') AS  engagement_time_msec,
-    geo.city as city,
-    geo.country as country,
-    geo.region as region
+    (SELECT value.string_value FROM UNNEST(event_params) WHERE key = 'language_site') AS  language_site,
+    (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_id') AS  ga_session_id,
+    (SELECT value.int_value FROM UNNEST(event_params) WHERE key = 'ga_session_number') AS  ga_session_number,
+    geo.country as user_country,
+    geo.region as user_province,
+    (SELECT up.value.string_value FROM UNNEST(user_properties) up WHERE up.key = 'user_studies') AS user_studies
 
   FROM ${ref("base")}
   WHERE event_name = 'purchase' 

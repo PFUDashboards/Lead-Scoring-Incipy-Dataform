@@ -11,8 +11,9 @@ WITH atenea_window AS (
   CROSS JOIN ${ref("min_event_timestamp")} mit
   CROSS JOIN ${ref("max_event_timestamp")} mat
   CROSS JOIN ${ref("max_createdon_cte")} mc
+---COGEMOS EL MENOR VALOR DE LOS MAXIMOS DE ATENEA Y GA4
   WHERE pa.ld_timestamp <= LEAST(mc.max_createdon, mat.max_timestamp)
-    AND pa.ld_timestamp >= mit.min_timestamp + 365 * 24 * 60 * 60 * 1000000)
+    AND pa.ld_timestamp >= mit.min_timestamp)
 
 SELECT ld_timestamp, lead_day, lead_month, lead_year,
   ld_mcs_id, 

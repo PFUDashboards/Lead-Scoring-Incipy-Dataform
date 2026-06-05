@@ -4,6 +4,12 @@ config {
   schema: "BQ_PFU_INCIPY"
 }
 
+--RESTAMOS 30 DIAS DE ATENEA UN TIEMPO QUE CONSIDERAMOS PARA QUE EL LEAD DECIDE SI HACE MATRICULA
 SELECT
-  MAX(ld_timestamp) AS max_createdon
+    UNIX_MICROS(
+      TIMESTAMP_SUB(
+        TIMESTAMP_MICROS(MAX(ld_timestamp)),
+        INTERVAL 30 DAY
+      )
+    ) AS max_createdon
 FROM ${ref("pre_atenea")}
