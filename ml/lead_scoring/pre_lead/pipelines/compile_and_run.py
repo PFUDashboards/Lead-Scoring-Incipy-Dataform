@@ -35,9 +35,11 @@ def main() -> None:
                         "Compute SA, which usually lacks the metadata-store/BQ/GCS access)")
     p.add_argument("--env", default=os.environ.get("ENV", config.ENV),
                    help="logical environment (dev|prod) — namespaces the GCS model paths")
-    p.add_argument("--no-cache", dest="cache", action="store_false",
-                   help="disable Vertex step caching (ON by default). Caching keys on the "
-                        "table reference, not contents, so use --no-cache for a retrain on changed data")
+    p.add_argument("--cache", dest="cache", action="store_true",
+                   help="enable Vertex step caching (OFF by default). KFP keys on the table "
+                        "reference + the ':latest' image tag, NOT the code/data contents, so a "
+                        "cache hit can serve stale results after a rebuild. Only opt in locally "
+                        "when iterating on changes that don't touch upstream components")
     args = p.parse_args()
 
     env = args.env
