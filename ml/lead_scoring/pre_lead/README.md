@@ -75,10 +75,12 @@ ENV=dev ./deploy/03_deploy_serving.sh
 preprocessing and returns:
 
 ```json
-{ "segmento": "landing", "score": 0.071, "grade": "A", "lift_vs_base": 3.0, "features_used": [...] }
+{ "segmento": "landing", "score": 0.071, "grade": "D", "lift_vs_base": 3.0, "features_used": [...] }
 ```
 
-`grade` is an A/B/C ranking band (A = top 25% by score, B = 25–50%, C = bottom 50%).
+`grade` is a ranking band (top 25% / 25–50% / bottom 50% by score). The letters are
+**per segment** so they also signal absolute quality: `main` uses **A/B/C**, `landing`
+uses **D/E/F** (landing converts less, so even its top band ranks below main's).
 
 Only the model's features are read from the payload; missing keys become `MISSING`/`NaN`,
 extra keys are ignored — robust to schema drift.
@@ -109,7 +111,7 @@ curl -s -X POST "$URL/score" -H "Authorization: Bearer $TOK" \
        "page_name":"unbounce/mba",
        "page_location":"https://obs.edu/landing/mba?utm_campaign=brand",
        "user_studies":"es-2","language_site":"es","ga_session_number":2}'
-# {"segmento":"landing","score":0.498,"grade":"A","base_rate":0.0237,"lift_vs_base":21.0,
+# {"segmento":"landing","score":0.498,"grade":"D","base_rate":0.0237,"lift_vs_base":21.0,
 #  "features_used":["ga_session_number","user_studies","language_site","utm_campaign","page_path"],
 #  "schema_version":2}
 ```

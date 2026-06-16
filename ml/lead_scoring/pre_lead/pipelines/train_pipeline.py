@@ -214,7 +214,7 @@ def evaluate_model(
     metrics.log_metric("seg_daily_volume", seg_daily)
 
     # A/B/C grade legend on the SAME held-out scores -> honest rates.
-    grade_tab = evaluate.grade_table(y_true, scores, base, seg_daily)
+    grade_tab = evaluate.grade_table(y_true, scores, base, seg_daily, segment=segment)
     import math
 
     fpr, tpr, thr = evaluate.roc_points(y_true, scores)

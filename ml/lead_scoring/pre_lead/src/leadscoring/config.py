@@ -73,29 +73,62 @@ def model_uri(segment: str, stage: str = "live") -> str:
 
 
 # Score grades are percentile bands of the model's own (uncalibrated) score
-# distribution: A = top 25%, B = 25–50%, C = bottom 50%. Cutoffs are fitted per
-# model at train time (evaluate.grade_thresholds) and stored in the artifact.
+# distribution: top 25% / 25–50% / bottom 50%. Cutoffs are fitted per model at
+# train time (evaluate.grade_thresholds) and stored in the artifact.
+# CANONICAL bands stay A/B/C for every segment — the stability lift metrics
+# (lift_A/B/C), the promotion gate and the stored thresholds all key on these.
 GRADE_BANDS = [("A", 75), ("B", 50)]  # (grade, lower percentile); below B -> GRADE_FALLBACK
 GRADE_FALLBACK = "C"
 
+# Per-segment DISPLAY letters (what /score and the report show). main keeps A/B/C;
+# landing uses D/E/F because its leads convert less in absolute terms, so even a
+# top-band landing lead ranks below a main one. Top->bottom, aligned with the
+# canonical [A, B, C] order. Only relabels the visible letter; internals stay A/B/C.
+GRADE_LETTERS = {
+    "main": ["A", "B", "C"],
+    "landing": ["D", "E", "F"],
+}
 
-def grade_of(score, thresholds):
-    """Map a raw score to its letter grade using fitted per-model thresholds.
+
+def _canonical_grades() -> list:
+    """The canonical grade letters, top to bottom (``["A", "B", "C"]``)."""
+    return [g for g, _ in GRADE_BANDS] + [GRADE_FALLBACK]
+
+
+def display_grade(segment, canonical: str) -> str:
+    """Translate a canonical grade to the segment's display letter.
+
+    Args:
+        segment: Segment name (``"main"`` / ``"landing"``); unknown -> canonical.
+        canonical: The canonical grade (``"A"``/``"B"``/``"C"``).
+
+    Returns:
+        The per-segment display letter (e.g. ``"A"`` for main, ``"D"`` for landing),
+        or ``canonical`` unchanged if the segment or grade is unknown.
+    """
+    canon = _canonical_grades()
+    letters = GRADE_LETTERS.get(segment, canon)
+    return letters[canon.index(canonical)] if canonical in canon else canonical
+
+
+def grade_of(score, thresholds, segment=None):
+    """Map a raw score to its display letter grade using fitted per-model thresholds.
 
     Args:
         score: The model's raw score for one lead.
         thresholds: Per-model score cutoffs, e.g. ``{"A": q75, "B": q50}``.
+        segment: Segment name, to pick the display letters (main A/B/C, landing D/E/F).
 
     Returns:
-        The letter grade (``"A"``/``"B"``/``GRADE_FALLBACK``), or ``None`` when the
-        artifact carries no thresholds (older model), so the caller degrades gracefully.
+        The display letter grade for the segment, or ``None`` when the artifact carries
+        no thresholds (older model), so the caller degrades gracefully.
     """
     if not thresholds:
         return None
     for g, _ in GRADE_BANDS:
         if score >= thresholds[g]:
-            return g
-    return GRADE_FALLBACK
+            return display_grade(segment, g)
+    return display_grade(segment, GRADE_FALLBACK)
 
 
 def route_segment(payload: dict) -> str:

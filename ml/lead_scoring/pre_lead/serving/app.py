@@ -220,7 +220,7 @@ def score(payload: dict):
     return {
         "segmento": segment,
         "score": proba,
-        "grade": config.grade_of(proba, art.get("grade_thresholds")),
+        "grade": config.grade_of(proba, art.get("grade_thresholds"), segment),
         "base_rate": art.get("base_rate"),
         "lift_vs_base": (proba / art["base_rate"]) if art.get("base_rate") else None,
         "features_used": art["features"],

@@ -157,7 +157,7 @@ ENV=dev ./deploy/02_run_pipeline.sh
 - Installs `kfp` + `google-cloud-aiplatform` in the venv (first time).
 - Prints the job ID. **View it in the console**: Vertex AI → Pipelines (europe-west1).
   You'll see the graph, the **metrics, the ROC curve and the HTML report** per segment (with
-  **PR-AUC** highlighted and the **A/B/C grades** per lead).
+  **PR-AUC** highlighted and the per-lead grades — **A/B/C** for main, **D/E/F** for landing).
 
 When it finishes (green), check that the gate promoted the models to `live/`:
 ```bash
@@ -193,7 +193,7 @@ curl -s -X POST "$URL/score" -H "Authorization: Bearer $TOKEN" -H 'Content-Type:
 ```
 Returns something like:
 ```json
-{"segmento":"landing","score":0.07,"grade":"A","base_rate":0.023,"lift_vs_base":3.0,"features_used":[...]}
+{"segmento":"landing","score":0.07,"grade":"D","base_rate":0.023,"lift_vs_base":3.0,"features_used":[...]}
 ```
 
 > **Payload fields — routing and features:** the segment is decided by **`platform`**

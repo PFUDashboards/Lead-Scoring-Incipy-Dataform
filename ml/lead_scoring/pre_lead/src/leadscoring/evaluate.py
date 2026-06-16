@@ -209,7 +209,7 @@ def grade_thresholds(scores) -> dict:
     return {g: float(np.quantile(s, q / 100)) for g, q in config.GRADE_BANDS}
 
 
-def grade_table(y_true, scores, base: float, daily_volume: float) -> pd.DataFrame:
+def grade_table(y_true, scores, base: float, daily_volume: float, segment=None) -> pd.DataFrame:
     """Build the per-grade legend (non-cumulative).
 
     Reports conversion rate and lift vs random for each band, so the grade returned
@@ -221,6 +221,8 @@ def grade_table(y_true, scores, base: float, daily_volume: float) -> pd.DataFram
         scores: Model scores for the same rows.
         base: Base conversion rate (for the lift column).
         daily_volume: Avg total leads/day; scales the ``leads_dia`` column.
+        segment: Segment name, to label rows with the segment's display letters
+            (main A/B/C, landing D/E/F).
 
     Returns:
         A DataFrame with one row per grade (``grade``, ``banda``, ``leads_dia``,
@@ -241,7 +243,7 @@ def grade_table(y_true, scores, base: float, daily_volume: float) -> pd.DataFram
         tasa = float(seg.mean()) if len(seg) else float("nan")
         rows.append(
             {
-                "grade": g,
+                "grade": config.display_grade(segment, g),
                 "banda": f"{prev}–{up}%",
                 "leads_dia": (hi - lo) / max(n, 1) * daily_volume,
                 "tasa_exito": tasa,
@@ -274,7 +276,14 @@ def roc_points(y_true, scores, n: int = 200):
     return fpr.tolist(), tpr.tolist(), thr.tolist()
 
 
-_GRADE_COLORS = {"A": "#1e8e5a", "B": "#2f6fed", "C": "#9aa3ad"}
+# Colour by band POSITION (top->bottom), not by letter, so it works for both the
+# main A/B/C and the landing D/E/F labels: top=green, middle=blue, bottom=grey.
+_BAND_PALETTE = ["#1e8e5a", "#2f6fed", "#9aa3ad"]
+
+
+def _band_color(i: int) -> str:
+    """Return the colour for the i-th band (top to bottom), clamped to the palette."""
+    return _BAND_PALETTE[min(i, len(_BAND_PALETTE) - 1)]
 
 _REPORT_CSS = """
   :root { color-scheme: light; }
@@ -331,8 +340,8 @@ def _grades_section(grade_tab: pd.DataFrame, base: float) -> str:
     """
     max_tasa = max(float(grade_tab["tasa_exito"].max()), 1e-9)
     rows = []
-    for r in grade_tab.itertuples():
-        color = _GRADE_COLORS.get(r.grade, "#2f6fed")
+    for i, r in enumerate(grade_tab.itertuples()):
+        color = _band_color(i)
         width = max(float(r.tasa_exito) / max_tasa * 100, 3)
         pill = "liftpill" if r.vs_azar >= 1.0 else "liftpill low"
         rows.append(
@@ -345,8 +354,9 @@ def _grades_section(grade_tab: pd.DataFrame, base: float) -> str:
             f"<td><span class='{pill}'>{r.vs_azar:.1f}x</span></td>"
             f"</tr>"
         )
+    letters = " / ".join(str(g) for g in grade_tab["grade"])
     return f"""
-    <h2 class="sec">Grados A / B / C &mdash; prioridad de llamada</h2>
+    <h2 class="sec">Grados {letters} &mdash; prioridad de llamada</h2>
     <table>
       <thead><tr>
         <th>Grado</th><th>Posici&oacute;n en el ranking</th><th>Leads/d&iacute;a</th>
@@ -389,7 +399,7 @@ def html_report(segment: str, lift_tab: pd.DataFrame, base: float, stability: di
             xs = grade_tab["grade"].astype(str)
             ys = grade_tab["vs_azar"].astype(float)
             bars = ax.bar(xs, ys, width=0.62,
-                          color=[_GRADE_COLORS.get(g, "#2f6fed") for g in xs])
+                          color=[_band_color(i) for i in range(len(xs))])
             for b, v in zip(bars, ys):
                 ax.text(b.get_x() + b.get_width() / 2, v, f"{v:.1f}x",
                         ha="center", va="bottom", fontsize=10, fontweight="bold", color="#2a3140")
@@ -418,15 +428,17 @@ def html_report(segment: str, lift_tab: pd.DataFrame, base: float, stability: di
     pr = stability["pr_auc"]
     roc = stability["roc"]
     lift_a = stability.get("lift_A", {"mean": float("nan"), "std": 0.0})
+    # Display letter of the top band for this segment (main -> "A", landing -> "D").
+    top_letter = config.display_grade(segment, "A")
 
-    # Grade-A conversion rate for the pitch line (single-split legend, if present).
+    # Top-band conversion rate for the pitch line (single-split legend, if present).
     tasa_a = None
     if grade_tab is not None and len(grade_tab):
         tasa_a = float(grade_tab.iloc[0]["tasa_exito"])
 
     if tasa_a is not None and base:
         pitch = (
-            f'<div class="pitch">Llamando primero al <b>25% mejor</b> (grado A), el equipo '
+            f'<div class="pitch">Llamando primero al <b>25% mejor</b> (grado {top_letter}), el equipo '
             f'contacta leads que convierten <b>{lift_a["mean"]:.1f}x</b> más que la media: '
             f'<b>{tasa_a*100:.1f}%</b> frente al {base*100:.1f}% de tasa base.</div>'
         )
@@ -436,7 +448,7 @@ def html_report(segment: str, lift_tab: pd.DataFrame, base: float, stability: di
     kpis = f"""
     <div class="kpis">
       <div class="kpi hero">
-        <div class="lbl">Lift grado A</div>
+        <div class="lbl">Lift grado {top_letter}</div>
         <div class="val">{lift_a['mean']:.1f}x</div>
         <div class="sub">top 25% vs. media &middot; &plusmn;{lift_a['std']:.1f}</div>
       </div>
