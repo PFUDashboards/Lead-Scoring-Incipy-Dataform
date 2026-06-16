@@ -1,0 +1,14 @@
+# Keep Cloud Build upload small. The images only need src/, pyproject.toml,
+# training/ and serving/.
+.git/
+.venv/
+model_2_transformers/
+.claude/
+.vscode/
+notebooks/
+models/
+terraform/          # infra only; not in the image build (avoids uploading .terraform, ~100MB+)
+**/__pycache__/
+*.ipynb
+pipeline.json
+.python-version

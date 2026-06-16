@@ -1,0 +1,12 @@
+# ML libs pinned identical to training/ so the joblib unpickles cleanly.
+scikit-learn==1.8.0
+xgboost==3.2.0
+pandas==2.3.3
+numpy==2.4.4
+scipy==1.17.1
+joblib==1.5.3
+google-cloud-storage==3.10.1
+# serving
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4

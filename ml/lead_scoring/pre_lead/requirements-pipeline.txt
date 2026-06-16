@@ -1,0 +1,8 @@
+# Local deps to compile + submit the Vertex pipeline (run on your machine / CI).
+# NOTE: kfp 2.16.1 requires protobuf>=6.31.1, so aiplatform must be a recent
+# release (>=1.90) that allows protobuf 6.x — the old 1.79.0 capped it at <6 and
+# made the resolver fail. This env only compiles+submits the pipeline; the model
+# pins (sklearn/xgboost) live in the training image, not here.
+kfp==2.16.1
+google-cloud-aiplatform==1.156.0
+google-cloud-storage==3.10.1

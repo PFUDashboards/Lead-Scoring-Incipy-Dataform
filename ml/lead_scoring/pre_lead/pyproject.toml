@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "leadscoring"
+version = "0.1.0"
+description = "OBS lead-scoring: shared preprocessing/train/eval for Vertex + Cloud Run"
+requires-python = ">=3.12"
+# Runtime deps are pinned per-image (training/requirements.txt, serving/requirements.txt)
+# to keep each image minimal; this list is the lib's logical dependency set.
+dependencies = [
+    "numpy",
+    "pandas",
+    "scikit-learn",
+    "xgboost",
+    "scipy",
+    "joblib",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["leadscoring*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+# Notebooks + generated/IaC files aren't linted as library code.
+extend-exclude = ["notebooks", "terraform", "pipeline.json"]
+
+[tool.ruff.lint]
+# pycodestyle errors (E), pyflakes (F), import sorting (I). Lean rule set to start.
+select = ["E", "F", "I"]
+# E501 (line length) is off: evaluate.py / train_pipeline.py embed long HTML-report
+# f-strings that read worse wrapped. F-rules still catch real bugs (unused/undefined).
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["leadscoring"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
