@@ -17,21 +17,24 @@ REGION = os.environ.get("REGION", "europe-west1")  # must match the BQ data loca
 BUCKET = os.environ.get("BUCKET", "bq-pfu-ga4-leadscoring")  # gs://<BUCKET> — globally unique
 AR_REPO = os.environ.get("AR_REPO", "lead-scoring")
 
-# BigQuery source.
+# BigQuery source. The training table is built by the Dataform project (definitions/).
 BQ_DATASET = os.environ.get("BQ_DATASET", "BQ_PFU_INCIPY")
-BQ_TABLE = os.environ.get("BQ_TABLE", "lead_scoring_train")
+BQ_TABLE = os.environ.get("BQ_TABLE", "model_train_GTM")
 BQ_TABLE_REF = f"{PROJECT_ID}.{BQ_DATASET}.{BQ_TABLE}"
 BQ_LOCATION = os.environ.get("BQ_LOCATION", "EU")  # must be set for non-US datasets; keep in step with REGION
 
 # Schema contract. Features are derived dynamically as
 # (all columns) - ID_COLS - {TARGET, SEGMENT_COL}, so a BQ schema change can't break training.
 TARGET = "y"
+# The Dataform table exposes the target under this raw name; data.load renames it to TARGET.
+RAW_TARGET = os.environ.get("RAW_TARGET", "apd_es_matricula")
 SEGMENT_COL = "segmento"
 ID_COLS = [
     "event_timestamp",
     "user_pseudo_id",
     "ga_session_id",
     "transaction_id",
+    "ld_mcs_id",  # lead id in model_train_GTM — exclude from features, used as the data_hash key
 ]
 
 SEGMENTS = ["landing", "main"]

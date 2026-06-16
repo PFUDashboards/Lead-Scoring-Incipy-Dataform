@@ -135,6 +135,29 @@ curl -s -X POST "$URL/score" -H "Authorization: Bearer $TOK" \
 > a real lift — don't read it as "converts 21× more". Use the score to **rank leads and call
 > the top ones**; the validated lift is the grade-band lift (A = top 25%) from the pipeline (~1.5–2.4×).
 
+## Data source & provenance
+
+Training reads `bq-pfu-ga4.BQ_PFU_INCIPY.model_train_GTM`, built by the **Dataform** project
+in this repo. `deploy/02_run_pipeline.sh` **triggers Dataform first** (rebuilds the table) and
+then trains, so each run uses the latest data (`--skip-dataform` to opt out). The table's raw
+target `apd_es_matricula` is mapped to the model's `y` in `data.load`.
+
+Each model artifact records **provenance** instead of copying the data — so you can always tell
+which data trained it, even after the disposable pipeline intermediates are expired:
+
+```python
+artifact["provenance"] = {
+  "table_ref":    "bq-pfu-ga4.BQ_PFU_INCIPY.model_train_GTM",
+  "data_version": "...workflowInvocations/<id>",  # the Dataform run that built the table
+  "n_rows":       29360,
+  "data_hash":    "<sha256 of sorted ld_mcs_id + y>",  # changes only if rows/labels change
+}
+```
+
+The bucket keeps only the models: a GCS **lifecycle rule** deletes objects under
+`pipeline-root/` after 14 days (`pipeline_root_ttl_days`), scoped so it never touches
+`models/`. For byte-exact reproduction, snapshot the BQ table per run (not done by default).
+
 ## Environments & model promotion
 
 The model **retrains monthly**, so the central risk is a *bad* retrain (data drift, a

@@ -43,6 +43,12 @@ variable "ar_cleanup_dry_run" {
   description = "If true, AR cleanup policies only log what they WOULD delete instead of deleting. Set true to preview first."
 }
 
+variable "pipeline_root_ttl_days" {
+  type        = number
+  default     = 14
+  description = "Delete GCS objects under pipeline-root/ older than this many days. Scoped by matches_prefix so it never touches models/."
+}
+
 variable "alert_emails" {
   type        = list(string)
   default     = []

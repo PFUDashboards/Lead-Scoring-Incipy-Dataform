@@ -6,8 +6,8 @@
 #
 # Order: Cloud Run services -> bucket + AR repo (terraform OR gcloud) -> SA key.
 #
-# Does NOT touch: the BigQuery source table (dataset.lead_scoring_train, pre-existing
-# data), the project's default compute service account, or the APIs
+# Does NOT touch: the BigQuery source table (dataset.model_train_GTM, built by Dataform),
+# the project's default compute service account, or the APIs
 # (terraform keeps them enabled via disable_on_destroy=false).
 #
 # Usage:
@@ -39,7 +39,7 @@ cat <<EOF
     - Artifact Registry  : ${AR_REPO}       (with all images)
 $( [ "${DELETE_SA_KEYS}" = 1 ] && echo "    - SA keys            : ALL user-managed keys on the compute SA (breaks CI!)" )
   Will NOT touch:
-    - BigQuery table dataset.lead_scoring_train  (your source data)
+    - BigQuery table dataset.model_train_GTM  (your source data, built by Dataform)
     - the default compute service account / enabled APIs
 ================================================================================
 EOF

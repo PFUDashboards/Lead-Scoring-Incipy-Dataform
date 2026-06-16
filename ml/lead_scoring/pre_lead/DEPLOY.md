@@ -84,7 +84,7 @@ append `--impersonate-service-account=incipy-lead-scoring@bq-pfu-ga4.iam.gservic
 gcloud config get-value auth/impersonate_service_account
 
 # is the training table there? (already runs as the SA, EU)
-bq --location=EU show bq-pfu-ga4:BQ_PFU_INCIPY.lead_scoring_train
+bq --location=EU show bq-pfu-ga4:BQ_PFU_INCIPY.model_train_GTM
 ```
 
 ### Configuration (review before you start)
@@ -130,7 +130,8 @@ It's idempotent (you can re-run it without breaking anything). If you prefer raw
 > **3 Monitoring alerts** need `roles/monitoring.editor` on the SA; without it,
 > those resources fail with `403` and the rest (bucket, AR, APIs) is created anyway. Ask the admin
 > for it and repeat the `apply` (idempotent). To **build images** (step 1) the SA needs
-> `roles/cloudbuild.builds.editor`.
+> `roles/cloudbuild.builds.editor`. To **refresh Dataform** (step 2) the submit identity
+> (the SA locally, the CI key in Actions) needs `roles/dataform.editor`.
 
 > Alternative without Terraform: `./deploy/00_setup_gcp.sh` does the same with gcloud
 > (but **without** the pipeline-failure alert, which only exists in Terraform).
@@ -154,7 +155,17 @@ Compiles and launches the pipeline; trains the two models and leaves the artifac
 ```bash
 ENV=dev ./deploy/02_run_pipeline.sh
 ```
-- Installs `kfp` + `google-cloud-aiplatform` in the venv (first time).
+- **Refreshes the training table via Dataform first.** The script triggers the Dataform
+  workflow (`lead_scoring_main`), waits for it to SUCCEED, then trains on the freshly-built
+  `model_train_GTM` — so every run uses the latest GA4 data. The Dataform invocation id is
+  recorded as the model's `data_version` (see provenance in the README). A Dataform failure
+  aborts before any Vertex cost.
+  - Skip it (train on the table as-is): `ENV=dev ./deploy/02_run_pipeline.sh --skip-dataform`.
+  - Override the target: env `DATAFORM_REPO` / `DATAFORM_WORKFLOW` / `DATAFORM_LOCATION` /
+    `DATAFORM_PROJECT_NUMBER` (defaults match the `bq-pfu-ga4` repo).
+  - Needs `roles/dataform.editor` on the submit identity (the impersonated SA locally / the
+    CI key) — see Auth below.
+- Installs `kfp` + `google-cloud-aiplatform` + `google-cloud-dataform` in the venv (first time).
 - Prints the job ID. **View it in the console**: Vertex AI → Pipelines (europe-west1).
   You'll see the graph, the **metrics, the ROC curve and the HTML report** per segment (with
   **PR-AUC** highlighted and the per-lead grades — **A/B/C** for main, **D/E/F** for landing).
@@ -294,7 +305,8 @@ images). Uses `terraform destroy` if there's state; otherwise deletes with `gclo
 > **APIs** are not disabled (`disable_on_destroy=false`): they leave the Terraform state but
 > stay enabled (other things in the project use them).
 
-**Does NOT touch:** the BigQuery table `BQ_PFU_INCIPY.lead_scoring_train` (your data), the
+**Does NOT touch:** the BigQuery table `BQ_PFU_INCIPY.model_train_GTM` (your data, built by
+Dataform), the
 service accounts, or the APIs.
 
 **CI key (optional):** by default it's kept (GitHub Actions uses it). To delete the SA

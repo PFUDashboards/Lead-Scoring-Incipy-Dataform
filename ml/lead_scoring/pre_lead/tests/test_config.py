@@ -18,6 +18,15 @@ def test_model_uri_paths():
     assert config.model_uri("main") == config.model_uri("main", "live")
 
 
+def test_bq_source_contract():
+    # The training table is the Dataform output; lock the name + the raw-target map.
+    assert config.BQ_TABLE == "model_train_GTM"
+    assert config.BQ_TABLE_REF.endswith("BQ_PFU_INCIPY.model_train_GTM")
+    assert config.RAW_TARGET == "apd_es_matricula"
+    # ld_mcs_id (lead id) must be excluded from features (and is the data_hash key).
+    assert "ld_mcs_id" in config.ID_COLS
+
+
 def test_route_segment_landing_platform():
     assert config.route_segment({"platform": "landing"}) == "landing"
     assert config.route_segment({"platform": "  LANDING "}) == "landing"  # normalized

@@ -40,6 +40,12 @@ def main() -> None:
                         "reference + the ':latest' image tag, NOT the code/data contents, so a "
                         "cache hit can serve stale results after a rebuild. Only opt in locally "
                         "when iterating on changes that don't touch upstream components")
+    p.add_argument("--skip-dataform", action="store_true",
+                   help="do NOT refresh the BigQuery training table via Dataform before training")
+    p.add_argument("--dataform-repo", default=os.environ.get("DATAFORM_REPO"))
+    p.add_argument("--dataform-workflow", default=os.environ.get("DATAFORM_WORKFLOW"))
+    p.add_argument("--dataform-location", default=os.environ.get("DATAFORM_LOCATION"))
+    p.add_argument("--dataform-project-number", default=os.environ.get("DATAFORM_PROJECT_NUMBER"))
     args = p.parse_args()
 
     env = args.env
@@ -60,6 +66,24 @@ def main() -> None:
     if args.compile_only:
         return
 
+    # Refresh the training table via Dataform BEFORE submitting, so we train on the
+    # latest GA4 data. The invocation name becomes the provenance `data_version`. A
+    # Dataform failure raises here -> we exit non-zero before spending on Vertex.
+    import dataform_trigger  # noqa: E402  (same pipelines/ dir; lazy-imports the SDK)
+
+    if args.skip_dataform:
+        data_version = dataform_trigger.skipped_data_version()
+        print(f"skipping Dataform refresh; data_version={data_version}")
+    else:
+        print("triggering Dataform refresh of the training table ...")
+        data_version = dataform_trigger.run_workflow(
+            project_number=args.dataform_project_number,
+            location=args.dataform_location,
+            repo=args.dataform_repo,
+            workflow=args.dataform_workflow,
+        )
+        print(f"Dataform refresh SUCCEEDED; data_version={data_version}")
+
     from google.cloud import aiplatform
 
     aiplatform.init(project=config.PROJECT_ID, location=config.REGION,
@@ -72,6 +96,7 @@ def main() -> None:
             "table": config.BQ_TABLE_REF,
             "project": config.PROJECT_ID,
             "models_prefix": models_prefix,
+            "data_version": data_version,
             "n_iter": args.n_iter,
             "n_seeds": args.n_seeds,
             "daily_volume": args.daily_volume,

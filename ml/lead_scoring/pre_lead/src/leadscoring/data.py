@@ -7,6 +7,24 @@ import pandas as pd
 from . import config, preprocess
 
 
+def _apply_target_rename(df: pd.DataFrame) -> pd.DataFrame:
+    """Rename the raw target column to the model's ``TARGET`` contract (``y``).
+
+    The Dataform table exposes the target as ``config.RAW_TARGET``
+    (e.g. ``apd_es_matricula``); the model expects ``config.TARGET``. Idempotent:
+    a table that already carries ``y`` is left untouched (and never clobbered).
+
+    Args:
+        df: The raw DataFrame loaded from BigQuery.
+
+    Returns:
+        The DataFrame with the target column renamed to ``config.TARGET`` when needed.
+    """
+    if config.TARGET not in df.columns and config.RAW_TARGET in df.columns:
+        return df.rename(columns={config.RAW_TARGET: config.TARGET})
+    return df
+
+
 def load(table_ref: str | None = None, limit: int | None = None) -> pd.DataFrame:
     """Load the training table from BigQuery into a DataFrame.
 
@@ -31,6 +49,9 @@ def load(table_ref: str | None = None, limit: int | None = None) -> pd.DataFrame
     if limit:
         sql += f" LIMIT {int(limit)}"
     df = client.query(sql).to_dataframe()
+
+    # Map the Dataform raw target (apd_es_matricula) to the model contract (y).
+    df = _apply_target_rename(df)
 
     if config.SEGMENT_COL not in df.columns:
         plat = df.get("platform", pd.Series("", index=df.index)).astype(str).str.strip().str.lower()

@@ -38,23 +38,42 @@ BASE_IMAGE = os.environ.get(
 
 
 @dsl.component(base_image=BASE_IMAGE)
-def ingest(table: str, project: str, data: Output[Dataset]):
+def ingest(table: str, project: str, data_version: str, data: Output[Dataset]):
     """Load the BigQuery training table and write it to parquet.
+
+    Also computes the dataset provenance fingerprint (row count + a stable content
+    hash) ONCE here, and records it — together with ``table_ref`` and ``data_version``
+    — in the artifact metadata so downstream steps stamp it into the model without
+    re-hashing.
 
     Args:
         table: Fully-qualified ``project.dataset.table`` to read.
         project: GCP project for the BigQuery client.
+        data_version: Provenance tag for this data (the Dataform invocation name).
         data: Output dataset; the parquet is written to ``data.path`` and the row
-            count / column list are recorded in its metadata.
+            count / column list / provenance are recorded in its metadata.
     """
+    import hashlib
+
     from leadscoring import config
     from leadscoring import data as dataio
 
     config.PROJECT_ID = project
     df = dataio.load(table_ref=table)
     df.to_parquet(data.path)
+
+    # Stable content hash: sort by the id column so row-order changes don't change it;
+    # hash id + target so it only moves when the actual training rows/labels change.
+    key_cols = [c for c in ("ld_mcs_id",) if c in df.columns] or list(df.columns[:1])
+    hash_cols = key_cols + ([config.TARGET] if config.TARGET in df.columns else [])
+    rows = df[hash_cols].sort_values(key_cols).astype(str).agg("|".join, axis=1)
+    data_hash = hashlib.sha256("\n".join(rows.tolist()).encode()).hexdigest()
+
     data.metadata["rows"] = len(df)
     data.metadata["columns"] = list(df.columns)
+    data.metadata["data_hash"] = data_hash
+    data.metadata["data_version"] = data_version
+    data.metadata["table_ref"] = table
 
 
 @dsl.component(base_image=BASE_IMAGE)
@@ -75,6 +94,11 @@ def prepare_segment(data: Input[Dataset], segment: str, seg_out: Output[Dataset]
     seg.to_parquet(seg_out.path)
     seg_out.metadata["segment"] = segment
     seg_out.metadata["rows"] = len(seg)
+    # Carry the dataset provenance forward (computed once in ingest) so train_model
+    # can stamp it into the model without re-reading the full dataset.
+    for k in ("data_hash", "data_version", "table_ref"):
+        seg_out.metadata[k] = data.metadata.get(k, "")
+    seg_out.metadata["n_rows_total"] = data.metadata.get("rows", 0)
 
 
 @dsl.component(base_image=BASE_IMAGE)
@@ -146,6 +170,13 @@ def train_model(
     )
     xgb_model.save_model(model.path)  # native xgb json
 
+    # Data provenance carried from ingest via the segment artifact metadata.
+    provenance = {
+        "table_ref": seg.metadata.get("table_ref", ""),
+        "data_version": seg.metadata.get("data_version", ""),
+        "data_hash": seg.metadata.get("data_hash", ""),
+        "n_rows": int(seg.metadata.get("n_rows_total", 0)),
+    }
     meta = {
         "params": tuned["params"],
         "n_estimators": stability["median_best_iter"],
@@ -156,8 +187,10 @@ def train_model(
         "features": feats,
         "num": bundle["num"],
         "cat": bundle["cat"],
+        "provenance": provenance,
     }
     model.metadata.update({k: meta[k] for k in ("n_estimators", "base_rate", "n_train")})
+    model.metadata.update({"data_version": provenance["data_version"], "data_hash": provenance["data_hash"]})
     joblib.dump(meta, model.path + ".meta.joblib")
 
 
@@ -278,6 +311,7 @@ def package_artifact(
         "n_train": meta["n_train"],
         "metrics": meta["stability"],
         "grade_thresholds": grade_thr,
+        "provenance": meta.get("provenance", {}),
         "schema_version": 2,
     }
     local = f"/tmp/lead_scoring_{segment}.joblib"
@@ -405,6 +439,7 @@ def lead_scoring_pipeline(
     table: str,
     project: str,
     models_prefix: str,
+    data_version: str = "",
     n_iter: int = 60,
     n_seeds: int = 5,
     daily_volume: int = 250,
@@ -418,6 +453,7 @@ def lead_scoring_pipeline(
         table: Fully-qualified BigQuery training table.
         project: GCP project for the BigQuery/GCS clients.
         models_prefix: Base ``gs://`` prefix; ``candidate/`` and ``live/`` are appended.
+        data_version: Provenance tag for the training data (the Dataform invocation name).
         n_iter: ``RandomizedSearchCV`` iterations per segment.
         n_seeds: Seeds for the multi-seed stability evaluation.
         daily_volume: Avg total leads/day, split per segment in the report.
@@ -430,7 +466,7 @@ def lead_scoring_pipeline(
     SEGMENTS = cfg.SEGMENTS
     OVERRIDES = cfg.FEATURE_OVERRIDES
 
-    raw = ingest(table=table, project=project)
+    raw = ingest(table=table, project=project, data_version=data_version)
     for segment in SEGMENTS:
         seg = prepare_segment(data=raw.outputs["data"], segment=segment)
         seg.set_display_name(f"prepare-{segment}")

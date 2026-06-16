@@ -6,3 +6,5 @@
 kfp==2.16.1
 google-cloud-aiplatform==1.156.0
 google-cloud-storage==3.10.1
+# Trigger the Dataform workflow that rebuilds the training table before training.
+google-cloud-dataform==0.11.0

@@ -32,6 +32,20 @@ resource "google_storage_bucket" "models" {
   uniform_bucket_level_access = true
   force_destroy               = var.force_destroy_bucket
 
+  # Expire disposable pipeline scratch (parquet datasets, compiled specs, KFP
+  # intermediates) under pipeline-root/. matches_prefix is RELATIVE to the bucket
+  # root, so it scopes strictly to pipeline-root/ and NEVER touches models/ (the
+  # live + candidate joblibs that serving loads).
+  lifecycle_rule {
+    condition {
+      age            = var.pipeline_root_ttl_days
+      matches_prefix = ["pipeline-root/"]
+    }
+    action {
+      type = "Delete"
+    }
+  }
+
   depends_on = [google_project_service.enabled]
 }
 
