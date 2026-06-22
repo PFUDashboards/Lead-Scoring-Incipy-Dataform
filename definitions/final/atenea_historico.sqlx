@@ -26,13 +26,8 @@ WHERE execution_date <
 
 
 SELECT
-
 CURRENT_DATE() AS execution_date,
-
 CURRENT_TIMESTAMP() AS execution_timestamp,
-
 ld_createdon,
-
 apd_es_matricula
-
 FROM ${ref("Atenea")}
