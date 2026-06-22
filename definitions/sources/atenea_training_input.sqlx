@@ -1,0 +1,50 @@
+
+config {
+
+ type: "view",
+
+ schema: "BQ_PFU_INCIPY",
+
+ name: "atenea_training_input"
+
+}
+
+WITH fecha_utilizada AS (
+
+SELECT
+
+COALESCE(
+
+(
+
+SELECT
+
+MAX(execution_date)
+
+FROM ${ref("atenea_historico")}
+
+WHERE execution_date <= DATE(dataform.projectConfig.vars.execution_date)
+
+),
+
+(
+
+SELECT
+
+MIN(execution_date)
+
+FROM ${ref("atenea_historico")}
+
+)
+
+) AS execution_date
+
+)
+
+SELECT h.*
+
+FROM ${ref("atenea_historico")} h
+
+CROSS JOIN fecha_utilizada f
+
+WHERE h.execution_date = f.execution_date

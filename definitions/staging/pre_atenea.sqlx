@@ -12,4 +12,4 @@ SELECT
   ld_mcs_id,
   apd_es_matricula
 
-FROM ${ref("Atenea")}
+FROM ${ref("atenea_training_input")}

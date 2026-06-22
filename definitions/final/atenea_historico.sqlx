@@ -1,0 +1,38 @@
+config {
+  type: "incremental",
+  schema: "BQ_PFU_INCIPY",
+  name: "atenea_historico",
+  uniqueKey: [
+    "execution_date",
+    "apd_es_matricula"
+  ],
+
+  bigquery: {
+    partitionBy: "execution_date"
+  }
+}
+
+pre_operations {
+
+DELETE FROM ${self()}
+
+WHERE execution_date <
+      DATE_SUB(
+        CURRENT_DATE(),
+        INTERVAL 3 YEAR
+      );
+
+}
+
+
+SELECT
+
+CURRENT_DATE() AS execution_date,
+
+CURRENT_TIMESTAMP() AS execution_timestamp,
+
+ld_createdon,
+
+apd_es_matricula
+
+FROM ${ref("Atenea")}
