@@ -4,6 +4,14 @@ config {
   name: "base"
 }
 
+
+js {
+  const execution_date =
+    dataform.projectConfig.vars.execution_date ||
+    new Date().toISOString().slice(0,10);
+}
+
+
   SELECT * FROM `bq-pfu-ga4.analytics_261171297.events_*` 
   WHERE REGEXP_CONTAINS(_TABLE_SUFFIX, r'^\d{8}$')
-  AND _TABLE_SUFFIX >= FORMAT_DATE('%Y%m%d', DATE_SUB(CURRENT_DATE(), INTERVAL 2 YEAR))
+  AND _TABLE_SUFFIX >= FORMAT_DATE('%Y%m%d', DATE_SUB(DATE('${execution_date}'), INTERVAL 2 YEAR))

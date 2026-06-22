@@ -10,13 +10,16 @@ config {
 
 pre_operations {
 
-DELETE FROM ${self()}
+  DELETE FROM ${self()}
 
-WHERE execution_date <
+  WHERE
+      execution_date = CURRENT_DATE()
+
+   OR DATE(ld_createdon) <
       DATE_SUB(
         CURRENT_DATE(),
-        INTERVAL 3 YEAR
-      ) OR execution_date = CURRENT_DATE();
+        INTERVAL 4 YEAR
+      );
 
 }
 
