@@ -1,12 +1,14 @@
 
 config {
-
  type: "view",
-
  schema: "BQ_PFU_INCIPY",
-
  name: "atenea_training_input"
+}
 
+js {
+  const execution_date =
+    dataform.projectConfig.vars.execution_date ||
+    new Date().toISOString().slice(0,10);
 }
 
 WITH fecha_utilizada AS (
@@ -23,7 +25,7 @@ MAX(execution_date)
 
 FROM ${ref("atenea_historico")}
 
-WHERE execution_date <= DATE(dataform.projectConfig.vars.execution_date)
+WHERE execution_date <= DATE('${execution_date}')
 
 ),
 

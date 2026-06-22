@@ -2,10 +2,6 @@ config {
   type: "incremental",
   schema: "BQ_PFU_INCIPY",
   name: "atenea_historico",
-  uniqueKey: [
-    "execution_date",
-    "apd_es_matricula"
-  ],
 
   bigquery: {
     partitionBy: "execution_date"
@@ -20,7 +16,7 @@ WHERE execution_date <
       DATE_SUB(
         CURRENT_DATE(),
         INTERVAL 3 YEAR
-      );
+      ) OR execution_date = CURRENT_DATE();
 
 }
 
