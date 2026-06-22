@@ -1,0 +1,57 @@
+name: Train
+
+# Standalone retrains on a DATA cadence (not tied to a code push — that's deploy.yml):
+#   - workflow_dispatch: ad-hoc manual retrain, pick dev/prod (prod needs approval).
+#   - schedule (monthly): retrain PROD on the refreshed table; the in-pipeline SOFT
+#     gate decides promotion and the emails prompt a human to review.
+# Compiles + submits the Vertex pipeline with --wait, so the run reflects the real
+# outcome (green/red). Serving auto-reloads a freshly-promoted live model within ~5 min
+# (no redeploy); POST /reload forces it immediately.
+on:
+  workflow_dispatch:
+    inputs:
+      env:
+        description: "Target environment"
+        type: choice
+        options: [dev, prod]
+        default: dev
+  schedule:
+    # Monthly retrain at 03:00 UTC on the 1st — targets PROD. A cron can't approve the
+    # prod Environment, so this scheduled run is NOT gated by a human: the in-pipeline
+    # SOFT gate (candidate->live only if it doesn't regress) is the safety, and the
+    # success/failure emails (Cloud Monitoring) prompt someone to review. Schedule it a
+    # few hours AFTER Dataform refreshes the table so it trains on the new data.
+    - cron: "0 3 1 * *"
+
+defaults:
+  run:
+    working-directory: ml/lead_scoring/pre_lead
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    # GitHub's max; --wait blocks until Vertex finishes.
+    timeout-minutes: 360
+    # Approval ONLY for a MANUAL prod retrain (required reviewer on the prod Environment).
+    # The cron and dev runs use the `dev` Environment (no protection) so they don't hang.
+    # NOTE: a scheduled run trains PROD (ENV below) while GitHub shows the `dev`
+    # Environment label — the label only governs protection rules, not where it trains.
+    environment: ${{ (github.event_name == 'workflow_dispatch' && inputs.env == 'prod') && 'prod' || 'dev' }}
+    env:
+      # schedule -> prod; manual -> the chosen input; otherwise dev.
+      ENV: ${{ github.event_name == 'schedule' && 'prod' || inputs.env || 'dev' }}
+      PYTHON: python
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Compile + submit Vertex training pipeline (and wait)
+        # TEMP: --skip-dataform until the Dataform repo is configured to execute with a
+        # service account (it currently rejects running as the CI SA's end-user creds).
+        # Remove the flag to refresh the training table via Dataform on every run.
+        run: ./deploy/02_run_pipeline.sh --wait --skip-dataform

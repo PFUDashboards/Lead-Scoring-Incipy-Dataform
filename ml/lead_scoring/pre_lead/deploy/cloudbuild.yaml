@@ -1,0 +1,12 @@
+# Builds both images (training-base + serving) from the repo root context.
+# Invoked by deploy/01_build_images.sh with substitutions.
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ["build", "-f", "training/Dockerfile", "-t", "${_TRAINING_IMAGE}", "."]
+  - name: gcr.io/cloud-builders/docker
+    args: ["build", "-f", "serving/Dockerfile", "-t", "${_SERVING_IMAGE}", "."]
+images:
+  - "${_TRAINING_IMAGE}"
+  - "${_SERVING_IMAGE}"
+options:
+  logging: CLOUD_LOGGING_ONLY

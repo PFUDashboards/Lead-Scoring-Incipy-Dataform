@@ -1,1 +1,38 @@
 node_modules/
+
+# --- Python (ml/) ---
+**/__pycache__/
+*.py[cod]
+**/*.egg-info/
+**/.venv/
+.python-version
+**/.pytest_cache/
+**/.ruff_cache/
+
+# --- Terraform (never commit state or provider cache; lock file IS committed) ---
+**/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+override.tf
+override.tf.json
+
+# --- Generated ---
+**/pipeline.json
+**/model_2_transformers/
+
+# --- Secrets — GCP SA keys must never be committed (use GitHub secrets) ---
+**/key.json
+**/*-sa-key.json
+**/service-account*.json
+
+# --- Editor / OS / local ---
+.claude/
+.vscode/
+.idea/
+.DS_Store
+
+
+CLAUDE.md
+
+/ml/lead_scoring/pre_lead/notebooks/

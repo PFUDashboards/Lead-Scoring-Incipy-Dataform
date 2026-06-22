@@ -1,0 +1,35 @@
+name: CI
+
+# Quality gate for the pre_lead model: lint + unit tests. No GCP credentials —
+# runs safely on PRs (including forks). Build/deploy live in deploy.yml.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+defaults:
+  run:
+    working-directory: ml/lead_scoring/pre_lead
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            ml/lead_scoring/pre_lead/pyproject.toml
+            ml/lead_scoring/pre_lead/requirements-dev.txt
+
+      - name: Install package + dev tooling
+        run: pip install -e . -r requirements-dev.txt
+
+      - name: Ruff lint
+        run: ruff check .
+
+      - name: Pytest
+        run: pytest -q
