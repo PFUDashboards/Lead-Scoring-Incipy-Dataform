@@ -8,6 +8,7 @@ config {
   }
 }
 
+
 pre_operations {
 
   DELETE FROM ${self()}
@@ -15,10 +16,10 @@ pre_operations {
   WHERE
       execution_date = CURRENT_DATE()
 
-   OR DATE(ld_createdon) <
+   OR execution_date <
       DATE_SUB(
         CURRENT_DATE(),
-        INTERVAL 4 YEAR
+        INTERVAL 2 YEAR
       );
 
 }

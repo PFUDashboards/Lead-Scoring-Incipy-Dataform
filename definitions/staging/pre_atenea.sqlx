@@ -3,6 +3,13 @@ config {
   schema: "BQ_PFU_INCIPY"
 }
 
+js {
+  const execution_date =
+    dataform.projectConfig.vars.execution_date ||
+    new Date().toISOString().slice(0,10);
+}
+
+
 SELECT
   UNIX_MICROS(TIMESTAMP(ld_createdon)) AS ld_timestamp,
 
@@ -13,3 +20,8 @@ SELECT
   apd_es_matricula
 
 FROM ${ref("atenea_training_input")}
+ WHERE DATE(ld_createdon) >=
+      DATE_SUB(
+        DATE('${execution_date}'),
+        INTERVAL 2 YEAR
+      )
