@@ -202,7 +202,7 @@ def score(payload: dict):
 
     Returns:
         A dict with ``segmento``, ``score``, ``grade``, ``base_rate``,
-        ``lift_vs_base``, ``features_used`` and ``schema_version``.
+        ``features_used`` and ``schema_version``.
 
     Raises:
         HTTPException: 503 if no models are loaded.
@@ -222,7 +222,6 @@ def score(payload: dict):
         "score": proba,
         "grade": config.grade_of(proba, art.get("grade_thresholds"), segment),
         "base_rate": art.get("base_rate"),
-        "lift_vs_base": (proba / art["base_rate"]) if art.get("base_rate") else None,
         "features_used": art["features"],
         "schema_version": art.get("schema_version"),
     }
