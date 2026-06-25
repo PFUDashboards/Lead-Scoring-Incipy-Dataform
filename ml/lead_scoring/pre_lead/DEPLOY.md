@@ -160,7 +160,6 @@ ENV=dev ./deploy/02_run_pipeline.sh
   `model_train_GTM` — so every run uses the latest GA4 data. The Dataform invocation id is
   recorded as the model's `data_version` (see provenance in the README). A Dataform failure
   aborts before any Vertex cost.
-  - Skip it (train on the table as-is): `ENV=dev ./deploy/02_run_pipeline.sh --skip-dataform`.
   - Override the target: env `DATAFORM_REPO` / `DATAFORM_WORKFLOW` / `DATAFORM_LOCATION` /
     `DATAFORM_PROJECT_NUMBER` (defaults match the `bq-pfu-ga4` repo).
   - Needs `roles/dataform.editor` on the submit identity (the impersonated SA locally / the
@@ -204,7 +203,7 @@ curl -s -X POST "$URL/score" -H "Authorization: Bearer $TOKEN" -H 'Content-Type:
 ```
 Returns something like:
 ```json
-{"segmento":"landing","score":0.07,"grade":"D","base_rate":0.023,"lift_vs_base":3.0,"features_used":[...]}
+{"segmento":"landing","score":0.07,"grade":"D","base_rate":0.023,"features_used":[...]}
 ```
 
 > **Payload fields — routing and features:** the segment is decided by **`platform`**

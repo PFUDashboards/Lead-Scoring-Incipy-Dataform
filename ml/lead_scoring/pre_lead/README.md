@@ -75,7 +75,7 @@ ENV=dev ./deploy/03_deploy_serving.sh
 preprocessing and returns:
 
 ```json
-{ "segmento": "landing", "score": 0.071, "grade": "D", "lift_vs_base": 3.0, "features_used": [...] }
+{ "segmento": "landing", "score": 0.071, "grade": "D", "base_rate": 0.024, "features_used": [...] }
 ```
 
 `grade` is a ranking band (top 25% / 25–50% / bottom 50% by score). The letters are
@@ -111,7 +111,7 @@ curl -s -X POST "$URL/score" -H "Authorization: Bearer $TOK" \
        "page_name":"unbounce/mba",
        "page_location":"https://obs.edu/landing/mba?utm_campaign=brand",
        "user_studies":"es-2","language_site":"es","ga_session_number":2}'
-# {"segmento":"landing","score":0.498,"grade":"D","base_rate":0.0237,"lift_vs_base":21.0,
+# {"segmento":"landing","score":0.498,"grade":"D","base_rate":0.0237,
 #  "features_used":["ga_session_number","user_studies","language_site","utm_campaign","page_path"],
 #  "schema_version":2}
 ```
@@ -125,22 +125,22 @@ curl -s -X POST "$URL/score" -H "Authorization: Bearer $TOK" \
   -d '{"platform":"main_site","form_name":"web_contacto","product_id":"mba-full",
        "page_name":"producto/detalle/mba","user_country":"ES","user_province":"Barcelona",
        "user_studies":"es-3","ga_session_number":4}'
-# {"segmento":"main","score":0.534,"grade":"B","base_rate":0.1229,"lift_vs_base":4.34,
+# {"segmento":"main","score":0.534,"grade":"B","base_rate":0.1229,
 #  "features_used":["ga_session_number","product_id","user_country","user_province","user_studies","form_name","page_name"],
 #  "schema_version":2}
 ```
 
 > ⚠️ **`score` is a ranking score, not a calibrated probability.** `scale_pos_weight`
-> centers raw scores near 0.5, so the `lift_vs_base` field (= `score / base_rate`) is **not**
-> a real lift — don't read it as "converts 21× more". Use the score to **rank leads and call
-> the top ones**; the validated lift is the grade-band lift (A = top 25%) from the pipeline (~1.5–2.4×).
+> centers raw scores near 0.5, so `score / base_rate` is **not** a real lift — don't read it
+> that way. Use the score to **rank leads and call the top ones**; the validated lift is the
+> grade-band lift (A = top 25%) from the pipeline (~1.5–2.4×).
 
 ## Data source & provenance
 
 Training reads `bq-pfu-ga4.BQ_PFU_INCIPY.model_train_GTM`, built by the **Dataform** project
 in this repo. `deploy/02_run_pipeline.sh` **triggers Dataform first** (rebuilds the table) and
-then trains, so each run uses the latest data (`--skip-dataform` to opt out). The table's raw
-target `apd_es_matricula` is mapped to the model's `y` in `data.load`.
+then trains, so each run uses the latest data. The table's raw target `apd_es_matricula` is
+mapped to the model's `y` in `data.load`.
 
 Each model artifact records **provenance** instead of copying the data — so you can always tell
 which data trained it, even after the disposable pipeline intermediates are expired:
