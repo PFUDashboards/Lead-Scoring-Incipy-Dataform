@@ -139,8 +139,8 @@ curl -s -X POST "$URL/score" -H "Authorization: Bearer $TOK" \
 
 Training reads `bq-pfu-ga4.BQ_PFU_INCIPY.model_train_GTM`, built by the **Dataform** project
 in this repo. `deploy/02_run_pipeline.sh` **triggers Dataform first** (rebuilds the table) and
-then trains, so each run uses the latest data (`--skip-dataform` to opt out). The table's raw
-target `apd_es_matricula` is mapped to the model's `y` in `data.load`.
+then trains, so each run uses the latest data. The table's raw target `apd_es_matricula` is
+mapped to the model's `y` in `data.load`.
 
 Each model artifact records **provenance** instead of copying the data — so you can always tell
 which data trained it, even after the disposable pipeline intermediates are expired:

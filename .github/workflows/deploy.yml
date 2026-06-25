@@ -75,10 +75,7 @@ jobs:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
       - uses: google-github-actions/setup-gcloud@v2
       - name: Train on Vertex and wait for it to finish
-        # TEMP: --skip-dataform until the Dataform repo is configured to execute with a
-        # service account (it currently rejects running as the CI SA's end-user creds).
-        # Remove the flag to refresh the training table via Dataform on every run.
-        run: ./deploy/02_run_pipeline.sh --wait --skip-dataform
+        run: ./deploy/02_run_pipeline.sh --wait
 
   deploy:
     needs: train

@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import os
 import time
-from datetime import datetime, timezone
 
 # Defaults for the bq-pfu-ga4 Dataform repository (override via env / args).
 DEFAULT_PROJECT_NUMBER = "992321307436"
@@ -36,15 +35,6 @@ def _repo_path(project_number: str, location: str, repo: str) -> str:
         The ``projects/.../locations/.../repositories/...`` resource name.
     """
     return f"projects/{project_number}/locations/{location}/repositories/{repo}"
-
-
-def skipped_data_version() -> str:
-    """Provenance marker when Dataform is skipped: a UTC timestamp, never empty.
-
-    Returns:
-        A string like ``skipped-20260616T130000Z``.
-    """
-    return "skipped-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
 
 def run_workflow(

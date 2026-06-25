@@ -23,11 +23,6 @@ def test_repo_path():
     )
 
 
-def test_skipped_data_version_marker():
-    v = dt.skipped_data_version()
-    assert v.startswith("skipped-") and v.endswith("Z")
-
-
 def _fake_dataform_module(final_state_name):
     """Build a fake dataform_v1beta1 module whose invocation ends in final_state_name."""
     mod = types.ModuleType("google.cloud.dataform_v1beta1")
