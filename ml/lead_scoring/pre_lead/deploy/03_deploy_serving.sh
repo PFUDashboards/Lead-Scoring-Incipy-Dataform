@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploy the scoring API to Cloud Run (scale-to-zero). Auth required by default.
+# Deploy the scoring API to Cloud Run. prod: private + scale-to-zero. dev: public + warm.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source deploy/config.sh
@@ -16,14 +16,25 @@ if [ -n "${RUNTIME_SA}" ]; then
   SA_ARGS+=(--service-account "${RUNTIME_SA}")
 fi
 
+# dev is a sandbox for integrators without a backend: public (so they can curl /score with
+# no Google identity) and kept warm (min-instances 1, no cold-start wait). prod stays private
+# and scale-to-zero. Both knobs are env-overridable for one-offs.
+if [ "${ENV}" = "dev" ]; then
+  AUTH_ARG="--allow-unauthenticated"
+  MIN_INSTANCES="${MIN_INSTANCES:-1}"
+else
+  AUTH_ARG="--no-allow-unauthenticated"
+  MIN_INSTANCES="${MIN_INSTANCES:-0}"
+fi
+
 echo ">> Deploying ${SERVICE} to Cloud Run (${REGION}, env ${ENV}, serving the LIVE model)"
 gcloud run deploy "${SERVICE}" \
   --project "${PROJECT_ID}" \
   --region "${REGION}" \
   --image "${SERVING_IMAGE}" \
   --set-env-vars "ENV=${ENV},GCS_MODEL_PREFIX=${GCS_MODEL_PREFIX},PROJECT_ID=${PROJECT_ID},REGION=${REGION}" \
-  --memory 1Gi --cpu 1 --min-instances 0 --max-instances 5 \
-  --no-allow-unauthenticated \
+  --memory 1Gi --cpu 1 --min-instances "${MIN_INSTANCES}" --max-instances 5 \
+  "${AUTH_ARG}" \
   "${SA_ARGS[@]}"
 
 URL=$(gcloud run services describe "${SERVICE}" --project "${PROJECT_ID}" --region "${REGION}" --format='value(status.url)')
