@@ -19,8 +19,8 @@ on:
     # Monthly retrain at 03:00 UTC on the 1st — targets PROD. A cron can't approve the
     # prod Environment, so this scheduled run is NOT gated by a human: the in-pipeline
     # SOFT gate (candidate->live only if it doesn't regress) is the safety, and the
-    # success/failure emails (Cloud Monitoring) prompt someone to review. Schedule it a
-    # few hours AFTER Dataform refreshes the table so it trains on the new data.
+    # success/failure emails (Cloud Monitoring) prompt someone to review. The run
+    # refreshes the table via Dataform itself (02_run_pipeline.sh) before training.
     - cron: "0 3 1 * *"
 
 defaults:
