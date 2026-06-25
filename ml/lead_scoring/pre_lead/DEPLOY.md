@@ -203,7 +203,7 @@ curl -s -X POST "$URL/score" -H "Authorization: Bearer $TOKEN" -H 'Content-Type:
 ```
 Returns something like:
 ```json
-{"segmento":"landing","score":0.07,"grade":"D","base_rate":0.023,"lift_vs_base":3.0,"features_used":[...]}
+{"segmento":"landing","score":0.07,"grade":"D","base_rate":0.023,"features_used":[...]}
 ```
 
 > **Payload fields — routing and features:** the segment is decided by **`platform`**
