@@ -40,8 +40,6 @@ def main() -> None:
                         "reference + the ':latest' image tag, NOT the code/data contents, so a "
                         "cache hit can serve stale results after a rebuild. Only opt in locally "
                         "when iterating on changes that don't touch upstream components")
-    p.add_argument("--skip-dataform", action="store_true",
-                   help="do NOT refresh the BigQuery training table via Dataform before training")
     p.add_argument("--dataform-repo", default=os.environ.get("DATAFORM_REPO"))
     p.add_argument("--dataform-workflow", default=os.environ.get("DATAFORM_WORKFLOW"))
     p.add_argument("--dataform-location", default=os.environ.get("DATAFORM_LOCATION"))
@@ -71,18 +69,14 @@ def main() -> None:
     # Dataform failure raises here -> we exit non-zero before spending on Vertex.
     import dataform_trigger  # noqa: E402  (same pipelines/ dir; lazy-imports the SDK)
 
-    if args.skip_dataform:
-        data_version = dataform_trigger.skipped_data_version()
-        print(f"skipping Dataform refresh; data_version={data_version}")
-    else:
-        print("triggering Dataform refresh of the training table ...")
-        data_version = dataform_trigger.run_workflow(
-            project_number=args.dataform_project_number,
-            location=args.dataform_location,
-            repo=args.dataform_repo,
-            workflow=args.dataform_workflow,
-        )
-        print(f"Dataform refresh SUCCEEDED; data_version={data_version}")
+    print("triggering Dataform refresh of the training table ...")
+    data_version = dataform_trigger.run_workflow(
+        project_number=args.dataform_project_number,
+        location=args.dataform_location,
+        repo=args.dataform_repo,
+        workflow=args.dataform_workflow,
+    )
+    print(f"Dataform refresh SUCCEEDED; data_version={data_version}")
 
     from google.cloud import aiplatform
 
