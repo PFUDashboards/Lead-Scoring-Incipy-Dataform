@@ -87,8 +87,11 @@ extra keys are ignored — robust to schema drift.
 
 ### Examples
 
-The Cloud Run service is private: each call needs an identity token from a service account
-with `roles/run.invoker` (granted by the `03` script), with the audience set to the service URL.
+In **prod** the Cloud Run service is private: each call needs an identity token from a service
+account with `roles/run.invoker` (granted by the `03` script), with the audience set to the
+service URL. In **dev** the service is public (no token needed) and kept warm (`min-instances 1`,
+no cold-start wait) so integrators without a backend can test `/score` directly — drop the
+`Authorization` header in the examples below. Both are set per-env by `03_deploy_serving.sh`.
 
 ```bash
 URL=$(gcloud run services describe lead-scoring-dev --region europe-west1 \
