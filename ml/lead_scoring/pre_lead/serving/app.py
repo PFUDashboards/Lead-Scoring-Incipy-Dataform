@@ -10,6 +10,8 @@ GCS re-check (MODEL_RELOAD_CHECK_SECONDS); POST /reload forces it immediately.
 Env:
   GCS_MODEL_PREFIX            gs://<bucket>/models (where the pipeline wrote the joblibs)
   MODEL_RELOAD_CHECK_SECONDS  min seconds between live-model re-checks (default 300; 0 disables)
+  CORS_ALLOW_ORIGINS          comma-separated origins allowed to call from a browser
+                              (default '*'; set to the landing domain(s) to restrict)
   PORT                        provided by Cloud Run (default 8080)
 """
 from __future__ import annotations
@@ -22,11 +24,38 @@ import time
 import joblib
 import pandas as pd
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from leadscoring import config, preprocess
 
 app = FastAPI(title="OBS lead scoring", version="1.0")
+
+
+def _cors_origins() -> list[str]:
+    """Parse the browser origins allowed to call this service.
+
+    The landing page (no backend) calls ``/score`` directly from the browser, so the
+    response must carry ``Access-Control-Allow-Origin`` or the browser blocks it.
+    Reads the comma-separated ``CORS_ALLOW_ORIGINS`` env var; defaults to ``["*"]``
+    (any origin) since the dev endpoint is already public. CORS only governs browser
+    JS — it is not an auth control for non-browser clients.
+
+    Returns:
+        The list of allowed origins, or ``["*"]`` to allow any.
+    """
+    raw = os.environ.get("CORS_ALLOW_ORIGINS", "*").strip()
+    if raw == "*" or not raw:
+        return ["*"]
+    return [o.strip() for o in raw.split(",") if o.strip()]
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_cors_origins(),
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+)
 
 # In-memory artifacts + the GCS generation each was loaded from, so we can skip
 # re-downloading an unchanged model.

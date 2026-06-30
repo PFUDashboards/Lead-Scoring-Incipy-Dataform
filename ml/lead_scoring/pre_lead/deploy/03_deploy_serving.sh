@@ -27,12 +27,18 @@ else
   MIN_INSTANCES="${MIN_INSTANCES:-0}"
 fi
 
+# Browser origins allowed to call /score directly from the landing (no backend). Default '*'
+# (the dev endpoint is already public); set CORS_ALLOW_ORIGINS to the landing domain(s) to pin
+# it, e.g. CORS_ALLOW_ORIGINS="https://landing.obs.edu,https://www.obs.edu". The ^@^ prefix makes
+# gcloud use '@' as the env-var delimiter so commas inside this value don't split the list.
+CORS_ALLOW_ORIGINS="${CORS_ALLOW_ORIGINS:-*}"
+
 echo ">> Deploying ${SERVICE} to Cloud Run (${REGION}, env ${ENV}, serving the LIVE model)"
 gcloud run deploy "${SERVICE}" \
   --project "${PROJECT_ID}" \
   --region "${REGION}" \
   --image "${SERVING_IMAGE}" \
-  --set-env-vars "ENV=${ENV},GCS_MODEL_PREFIX=${GCS_MODEL_PREFIX},PROJECT_ID=${PROJECT_ID},REGION=${REGION}" \
+  --set-env-vars "^@^ENV=${ENV}@GCS_MODEL_PREFIX=${GCS_MODEL_PREFIX}@PROJECT_ID=${PROJECT_ID}@REGION=${REGION}@CORS_ALLOW_ORIGINS=${CORS_ALLOW_ORIGINS}" \
   --memory 1Gi --cpu 1 --min-instances "${MIN_INSTANCES}" --max-instances 5 \
   "${AUTH_ARG}" \
   "${SA_ARGS[@]}"
