@@ -52,7 +52,9 @@ def _xgb(spw: float, seed: int, n_estimators: int, early: bool, **params):
 def tune_segment(df: pd.DataFrame, override=None, n_iter: int = 60, seed: int = 42) -> dict:
     """Search hyper-params on a leak-free split and report a held-out test score.
 
-    Does not return a deployable model (call :func:`fit_production` for that).
+    Does not return a deployable model (call :func:`fit_production` for that). The
+    preprocessor is fitted on the train split only (never on eval/test), so the
+    reported test score carries no leakage.
 
     Args:
         df: The segment DataFrame to tune on.
@@ -76,7 +78,7 @@ def tune_segment(df: pd.DataFrame, override=None, n_iter: int = 60, seed: int = 
         X_tmp, y_tmp, test_size=2 / 3, stratify=y_tmp, random_state=seed
     )
 
-    pre = preprocess.build_preprocessor(num, cat).fit(X_tr)  # train only — no leakage
+    pre = preprocess.build_preprocessor(num, cat).fit(X_tr)
     A_tr, A_ev, A_te = pre.transform(X_tr), pre.transform(X_ev), pre.transform(X_te)
     spw = (y_tr == 0).sum() / max((y_tr == 1).sum(), 1)
 

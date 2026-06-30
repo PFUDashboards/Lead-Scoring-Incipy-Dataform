@@ -19,7 +19,15 @@ from leadscoring import config  # noqa: E402
 
 
 def main() -> None:
-    """Parse CLI args, compile the KFP pipeline and optionally submit it to Vertex."""
+    """Parse CLI args, compile the KFP pipeline and optionally submit it to Vertex.
+
+    Unless ``--compile-only`` is given, the training table is refreshed via Dataform
+    BEFORE submitting, so the job trains on the latest GA4 data; the invocation name
+    becomes the provenance ``data_version`` and a Dataform failure aborts here, before
+    any Vertex spend. The model prefix is namespaced by ``--env`` (the pipeline appends
+    ``candidate/`` and ``live/``). With ``--wait``, the call blocks until the pipeline
+    finishes and exits non-zero on failure, so CI turns red.
+    """
     p = argparse.ArgumentParser()
     p.add_argument("--compile-only", action="store_true")
     p.add_argument("--output", default="pipeline.json")
@@ -47,15 +55,14 @@ def main() -> None:
     args = p.parse_args()
 
     env = args.env
-    # Env-namespaced model prefix; the pipeline appends candidate/ and live/.
     models_prefix = f"gs://{config.BUCKET}/models/{env}"
 
     image = args.training_image or os.environ.get("TRAINING_IMAGE") or (
         f"{config.REGION}-docker.pkg.dev/{config.PROJECT_ID}/{config.AR_REPO}/training-base:latest"
     )
-    os.environ["TRAINING_IMAGE"] = image  # @dsl.component captures base_image at import time
+    os.environ["TRAINING_IMAGE"] = image
 
-    import train_pipeline  # noqa: E402  (imported after env is set)
+    import train_pipeline  # noqa: E402
     from kfp import compiler
 
     compiler.Compiler().compile(train_pipeline.lead_scoring_pipeline, args.output)
@@ -64,10 +71,7 @@ def main() -> None:
     if args.compile_only:
         return
 
-    # Refresh the training table via Dataform BEFORE submitting, so we train on the
-    # latest GA4 data. The invocation name becomes the provenance `data_version`. A
-    # Dataform failure raises here -> we exit non-zero before spending on Vertex.
-    import dataform_trigger  # noqa: E402  (same pipelines/ dir; lazy-imports the SDK)
+    import dataform_trigger  # noqa: E402
 
     print("triggering Dataform refresh of the training table ...")
     data_version = dataform_trigger.run_workflow(
@@ -106,7 +110,6 @@ def main() -> None:
         print(f"  running as service account: {args.service_account}")
 
     if args.wait:
-        # wait() raises if the pipeline ends in error -> non-zero exit -> CI goes red.
         print("waiting for the pipeline to finish (this blocks until Vertex is done)...")
         job.wait()
         print(f"pipeline SUCCEEDED ({env}):", job.resource_name)

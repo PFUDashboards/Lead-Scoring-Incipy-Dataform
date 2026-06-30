@@ -40,7 +40,8 @@ def derive_columns(df: pd.DataFrame) -> pd.DataFrame:
     """Engineer features identically in train and serve.
 
     ``page_path`` = ``page_name`` (GA content label, NOT parsed from the URL).
-    ``utm_campaign`` = utm_campaign param extracted from ``page_location``.
+    ``utm_campaign`` = utm_campaign param extracted from ``page_location``. An empty or
+    non-string ``page_name`` is treated as missing (``NaN``), never an empty-string category.
 
     Args:
         df: Raw rows carrying ``page_name`` / ``page_location`` (either may be absent).
@@ -56,7 +57,6 @@ def derive_columns(df: pd.DataFrame) -> pd.DataFrame:
     loc = out["page_location"] if "page_location" in out.columns else pd.Series(
         np.nan, index=out.index
     )
-    # Empty/non-string page_name is missing (NaN), never an empty-string category.
     out["page_path"] = pd.Series(
         [v if (isinstance(v, str) and v) else np.nan for v in name],
         index=out.index, dtype=object,

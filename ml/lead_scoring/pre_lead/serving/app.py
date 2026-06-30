@@ -58,18 +58,21 @@ def _live_blob(uri: str):
 def _load_segment(segment: str, *, force: bool) -> bool:
     """(Re)load one segment's live artifact if its GCS generation changed.
 
-    Always the promoted 'live' artifact, never 'candidate'.
+    Always the promoted 'live' artifact, never 'candidate'. A non-``gs://`` URI is
+    treated as a local path (tests / dev). Any error loading one segment is swallowed
+    and logged, so a single bad segment never takes down the others.
 
     Args:
         segment: Segment name to load.
         force: Reload even if the GCS generation is unchanged.
 
     Returns:
-        ``True`` if a (new) model was loaded, else ``False``.
+        ``True`` if a (new) model was loaded, else ``False`` (including when the GCS
+        generation is unchanged, the blob is missing, or loading failed).
     """
     uri = config.model_uri(segment, stage="live")
     try:
-        if not uri.startswith("gs://"):  # local path (tests / dev)
+        if not uri.startswith("gs://"):
             if not force and segment in MODELS:
                 return False
             MODELS[segment] = joblib.load(uri)
@@ -81,7 +84,7 @@ def _load_segment(segment: str, *, force: bool) -> bool:
                 print(f"WARNING: {segment} model not found at {uri}")
             return False
         if not force and _GENERATIONS.get(segment) == blob.generation:
-            return False  # already serving this exact object
+            return False
 
         fd, local = tempfile.mkstemp(suffix=".joblib")
         os.close(fd)
@@ -91,7 +94,7 @@ def _load_segment(segment: str, *, force: bool) -> bool:
         os.remove(local)
         print(f"loaded {segment} model from {uri} (generation {blob.generation})")
         return True
-    except Exception as e:  # one bad segment must not take down the others
+    except Exception as e:
         print(f"WARNING: could not load {segment} model from {uri}: {e}")
         return False
 
@@ -122,7 +125,7 @@ def maybe_reload() -> None:
     if now - _last_check < CHECK_INTERVAL:
         return
     if not _reload_lock.acquire(blocking=False):
-        return  # another request is already checking
+        return
     try:
         _last_check = now
         changed = reload_models(force=False)
@@ -138,7 +141,8 @@ def _startup() -> None:
 
 
 class ScoreRequest(BaseModel):
-    # Free-form payload; only the model's features are used.
+    """A free-form lead payload; only the model's features are read from it."""
+
     model_config = {"extra": "allow"}
 
 
@@ -213,7 +217,7 @@ def score(payload: dict):
     segment = config.route_segment(payload)
     art = MODELS.get(segment) or next(iter(MODELS.values()))
 
-    row = preprocess.derive_columns(pd.DataFrame([payload]))  # same derive step as training
+    row = preprocess.derive_columns(pd.DataFrame([payload]))
     X = preprocess.transform(art["preprocessor"], row, art["num"], art["cat"])
     proba = float(art["model"].predict_proba(X)[0, 1])
 

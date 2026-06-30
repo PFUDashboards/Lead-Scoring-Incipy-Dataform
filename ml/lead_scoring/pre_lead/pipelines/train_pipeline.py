@@ -44,7 +44,8 @@ def ingest(table: str, project: str, data_version: str, data: Output[Dataset]):
     Also computes the dataset provenance fingerprint (row count + a stable content
     hash) ONCE here, and records it — together with ``table_ref`` and ``data_version``
     — in the artifact metadata so downstream steps stamp it into the model without
-    re-hashing.
+    re-hashing. The hash sorts by the id column so row-order changes don't move it, and
+    hashes id + target so it only moves when the actual training rows/labels change.
 
     Args:
         table: Fully-qualified ``project.dataset.table`` to read.
@@ -62,8 +63,6 @@ def ingest(table: str, project: str, data_version: str, data: Output[Dataset]):
     df = dataio.load(table_ref=table)
     df.to_parquet(data.path)
 
-    # Stable content hash: sort by the id column so row-order changes don't change it;
-    # hash id + target so it only moves when the actual training rows/labels change.
     key_cols = [c for c in ("ld_mcs_id",) if c in df.columns] or list(df.columns[:1])
     hash_cols = key_cols + ([config.TARGET] if config.TARGET in df.columns else [])
     rows = df[hash_cols].sort_values(key_cols).astype(str).agg("|".join, axis=1)
@@ -80,6 +79,10 @@ def ingest(table: str, project: str, data_version: str, data: Output[Dataset]):
 def prepare_segment(data: Input[Dataset], segment: str, seg_out: Output[Dataset]):
     """Subset the dataset to a single segment and write it to parquet.
 
+    The dataset provenance (computed once in :func:`ingest`) is carried forward in the
+    output metadata so ``train_model`` can stamp it into the model without re-reading
+    the full dataset.
+
     Args:
         data: Input dataset (the full training table from :func:`ingest`).
         segment: Segment name to keep.
@@ -94,8 +97,6 @@ def prepare_segment(data: Input[Dataset], segment: str, seg_out: Output[Dataset]
     seg.to_parquet(seg_out.path)
     seg_out.metadata["segment"] = segment
     seg_out.metadata["rows"] = len(seg)
-    # Carry the dataset provenance forward (computed once in ingest) so train_model
-    # can stamp it into the model without re-reading the full dataset.
     for k in ("data_hash", "data_version", "table_ref"):
         seg_out.metadata[k] = data.metadata.get(k, "")
     seg_out.metadata["n_rows_total"] = data.metadata.get("rows", 0)
@@ -168,9 +169,8 @@ def train_model(
         df, bundle["preprocessor"], bundle["num"], bundle["cat"],
         tuned["params"], stability["median_best_iter"],
     )
-    xgb_model.save_model(model.path)  # native xgb json
+    xgb_model.save_model(model.path)
 
-    # Data provenance carried from ingest via the segment artifact metadata.
     provenance = {
         "table_ref": seg.metadata.get("table_ref", ""),
         "data_version": seg.metadata.get("data_version", ""),
@@ -207,6 +207,13 @@ def evaluate_model(
 ):
     """Emit scalar Metrics + ROC curve + an HTML lift report to the Vertex UI.
 
+    The decile lift, test metrics and A/B/C grade legend are all computed on the SAME
+    held-out split so the reported rates are honest. Non-finite ROC thresholds are
+    clamped to 1.0: sklearn>=1.3 sets ``thresholds[0] = inf``, which serializes to
+    ``Infinity`` and Vertex's metadata store rejects. The clamp is repeated here (not
+    only in :func:`leadscoring.evaluate.roc_points`) because the component source is
+    embedded in the compiled pipeline, so the fix applies without rebuilding the image.
+
     Args:
         seg: Input segment dataset.
         data: The full dataset (to scale ``daily_volume`` by the segment's row share).
@@ -223,7 +230,6 @@ def evaluate_model(
     from leadscoring import evaluate
 
     df = pd.read_parquet(seg.path)
-    # Segment's slice of the global daily volume, by its share of the training rows.
     n_total = len(pd.read_parquet(data.path))
     seg_daily = daily_volume * (len(df) / max(n_total, 1))
     meta = joblib.load(model.path + ".meta.joblib")
@@ -238,7 +244,6 @@ def evaluate_model(
     metrics.log_metric("base_rate", meta["base_rate"])
     metrics.log_metric("n_train", meta["n_train"])
 
-    # Decile lift + test metrics on a held-out split.
     lift_tab, base, (y_true, scores) = evaluate.lift_by_decile(df, params, override=feats)
     test = evaluate.test_block(y_true, scores)
     metrics.log_metric("test_pr_auc", test["pr_auc"])
@@ -246,14 +251,10 @@ def evaluate_model(
     metrics.log_metric("test_recall_top10", test["recall"])
     metrics.log_metric("seg_daily_volume", seg_daily)
 
-    # A/B/C grade legend on the SAME held-out scores -> honest rates.
     grade_tab = evaluate.grade_table(y_true, scores, base, seg_daily, segment=segment)
     import math
 
     fpr, tpr, thr = evaluate.roc_points(y_true, scores)
-    # Clamp non-finite thresholds (sklearn>=1.3 thr[0]=inf -> "Infinity", which
-    # Vertex rejects). Repeated here since the component source is embedded in the
-    # compiled pipeline, so the fix applies without rebuilding the image.
     thr = [t if math.isfinite(t) else 1.0 for t in thr]
     cls_metrics.log_roc_curve(fpr, tpr, thr)
 
@@ -272,7 +273,9 @@ def package_artifact(
     """Bundle {preprocessor, model, features, metrics} to a joblib and upload it.
 
     Writes to the ``candidate`` stage only; ``validate_and_promote`` decides whether
-    this becomes the ``live`` model that serving loads.
+    this becomes the ``live`` model that serving loads. The grade cutoffs are fitted on
+    the production model's own score distribution so a live score grades consistently
+    with the deployed model.
 
     Args:
         seg: Input segment dataset (used to fit the grade thresholds).
@@ -292,8 +295,6 @@ def package_artifact(
     clf = xgb.XGBClassifier()
     clf.load_model(model.path)
 
-    # Grade cutoffs from the production model's own score distribution, so a live
-    # score grades consistently with the deployed model.
     df = pd.read_parquet(seg.path)
     X = preprocess.transform(bundle["preprocessor"], df, bundle["num"], bundle["cat"])
     grade_thr = evaluate.grade_thresholds(clf.predict_proba(X)[:, 1])
@@ -343,7 +344,8 @@ def validate_and_promote(
     raises. Compares the multi-seed ``metric`` (e.g. ``lift_A``) mean:
       * sanity:        candidate >= min_abs
       * no-regression: candidate >= live - max_regression
-    First run (no live model yet) bootstraps: promote if sanity passes.
+    First run (no live model yet) bootstraps: promote if sanity passes. On promotion the
+    candidate is copied to live within GCS (``copy_blob``, no re-upload).
 
     Args:
         model: The trained model artifact (its ``.meta.joblib`` holds the candidate
@@ -401,7 +403,6 @@ def validate_and_promote(
         promote, reason = False, f"REGRESSION: candidate {metric}={cand:.3f} < live {live:.3f} - {max_regression}"
 
     if promote:
-        # copy candidate -> live within GCS (no re-upload).
         cb, _, cblob = candidate_uri[len("gs://"):].partition("/")
         lb, _, lblob = live_uri[len("gs://"):].partition("/")
         src_bucket = client.bucket(cb)
@@ -448,6 +449,9 @@ def lead_scoring_pipeline(
     gate_max_regression: float = 0.15,
 ):
     """Define the segmented train + package + promote DAG.
+
+    ``validate_and_promote`` runs after ``package_artifact`` for each segment, so the
+    candidate joblib already exists in GCS before promotion reads/copies it.
 
     Args:
         table: Fully-qualified BigQuery training table.
@@ -517,5 +521,5 @@ def lead_scoring_pipeline(
             min_abs=gate_min_abs,
             max_regression=gate_max_regression,
         )
-        promote.after(pkg)  # candidate joblib must exist before promotion
+        promote.after(pkg)
         promote.set_display_name(f"validate-and-promote-{segment}")

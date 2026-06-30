@@ -30,6 +30,11 @@ def holdout_stability(df: pd.DataFrame, params: dict, override=None, n_seeds: in
         override: Optional explicit feature list.
         n_seeds: Number of seeded train/eval/test splits to average over.
 
+    Per-band lift is computed by RANK (sort by score, slice by position), same bands
+    as the A/B/C grades (``config.GRADE_BANDS``): A=top 0-25%, B=25-50%, C=50-100%
+    (non-cumulative). Rank slicing is robust to ties, unlike ``qcut`` deciles which
+    collapse when many scores are equal.
+
     Returns:
         A dict with mean/std of ``pr_auc``, ``roc`` and the per-grade-band lift
         (``lift_A``, ``lift_B``, ``lift_C`` — same 0-25/25-50/50-100% bands as the
@@ -39,9 +44,6 @@ def holdout_stability(df: pd.DataFrame, params: dict, override=None, n_seeds: in
     num, cat = preprocess.split_types(df, feats)
     X = preprocess.prep_X(df, num, cat)
     y = df[config.TARGET].astype(int)
-    # Rank bands, same as the A/B/C grades (config.GRADE_BANDS): A=top 0-25%, B=25-50%,
-    # C=50-100% (non-cumulative). Per-band lift by RANK (sort by score, slice by position)
-    # — robust to ties, unlike qcut deciles which collapse when many scores are equal.
     grades = [g for g, _ in config.GRADE_BANDS] + [config.GRADE_FALLBACK]
     uppers = [100 - q for _, q in config.GRADE_BANDS] + [100]
     rows, best_iters = [], []
@@ -172,7 +174,7 @@ def capacity_table(
     y = np.asarray(y_true).astype(int)
     s = np.asarray(scores, dtype=float)
     n = len(y)
-    order = np.argsort(-s, kind="stable")  # highest score first
+    order = np.argsort(-s, kind="stable")
     y_sorted = y[order]
     total_conv = max(int(y.sum()), 1)
     rows = []
@@ -214,7 +216,8 @@ def grade_table(y_true, scores, base: float, daily_volume: float, segment=None) 
 
     Reports conversion rate and lift vs random for each band, so the grade returned
     by ``/score`` is readable as a number. Bands come from ``config.GRADE_BANDS``,
-    sliced on the rank-sorted leads.
+    sliced on the rank-sorted leads; each band's upper edge is a cumulative
+    percentile-from-top (e.g. a 75 cutoff is the top 25%).
 
     Args:
         y_true: Ground-truth binary labels.
@@ -232,7 +235,6 @@ def grade_table(y_true, scores, base: float, daily_volume: float, segment=None) 
     s = np.asarray(scores, dtype=float)
     n = len(y)
     y_sorted = y[np.argsort(-s, kind="stable")]
-    # Cumulative upper edge of each band as a percentile-from-top (e.g. 75 -> 25%).
     uppers = [100 - q for _, q in config.GRADE_BANDS] + [100]
     grades = [g for g, _ in config.GRADE_BANDS] + [config.GRADE_FALLBACK]
     rows = []
@@ -373,7 +375,8 @@ def html_report(segment: str, lift_tab: pd.DataFrame, base: float, stability: di
     """Render the self-contained HTML evaluation report.
 
     Layout: a KPI card row (base rate, grade-A lift, PR-AUC, ROC-AUC), a plain-language
-    pitch line, the A/B/C grade legend table, and the lift-by-grade chart.
+    pitch line, the A/B/C grade legend table, and the lift-by-grade chart. ``matplotlib``
+    is optional; if it can't be imported the chart degrades to a small text note.
 
     Args:
         segment: Segment name, shown in the title.
@@ -421,17 +424,15 @@ def html_report(segment: str, lift_tab: pd.DataFrame, base: float, stability: di
         plt.close(fig)
         b64 = base64.b64encode(buf.getvalue()).decode()
         chart = f'<div class="chart"><img src="data:image/png;base64,{b64}"/></div>'
-    except Exception as e:  # matplotlib optional
+    except Exception as e:
         chart = f"<p><i>(gráfico no disponible: {e})</i></p>"
 
     n_seeds = stability.get("n_seeds")
     pr = stability["pr_auc"]
     roc = stability["roc"]
     lift_a = stability.get("lift_A", {"mean": float("nan"), "std": 0.0})
-    # Display letter of the top band for this segment (main -> "A", landing -> "D").
     top_letter = config.display_grade(segment, "A")
 
-    # Top-band conversion rate for the pitch line (single-split legend, if present).
     tasa_a = None
     if grade_tab is not None and len(grade_tab):
         tasa_a = float(grade_tab.iloc[0]["tasa_exito"])
